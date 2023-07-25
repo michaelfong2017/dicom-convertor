@@ -2,6 +2,8 @@
 //
 
 #include <iostream>
+#include <string>
+#include <vector>
 
 #include <torch/cuda.h>
 
@@ -11,11 +13,67 @@
 #include <vtkImageData.h>
 #include <vtkSmartPointer.h>
 
+#include "dcmtk/dcmdata/dcfilefo.h"
+#include "dcmtk/dcmdata/dcdatset.h"
+#include "dcmtk/dcmdata/dcdeftag.h"
+
 int main()
 {
     std::cout << "Number of CUDA devices available: " << torch::cuda::device_count() << std::endl;
     std::cout << "Whether at least one CUDA device is available: " << torch::cuda::is_available() << std::endl;
     std::cout << "Whether CUDA is available, and CuDNN is available: " << torch::cuda::cudnn_is_available() << std::endl;
+
+    DcmFileFormat fileformat;
+    if (fileformat.loadFile("C:\\Users\\user\\Documents\\dicom-convertor\\data\\PWHOR190734217S_12Oct2021_CX03WQDU_3DQ.dcm").good() == false) {
+        std::cerr << "Error: cannot read DICOM file" << std::endl;
+        return 1;
+    }
+
+    DcmDataset* dataset = fileformat.getDataset();
+
+    Uint16 columns = 0;
+    Uint16 rows = 0;
+    if (dataset->findAndGetUint16(DCM_Columns, columns).bad() ||
+        dataset->findAndGetUint16(DCM_Rows, rows).bad()) {
+        std::cerr << "Error: cannot read image dimensions from DICOM file\n";
+        return 1;
+    }
+
+    Uint32 slices;
+    if (dataset->findAndGetUint32(DcmTagKey(0x3001, 0x1001), slices).bad()) {
+        std::cerr << "Error: cannot read number of slices from DICOM file\n";
+        return 1;
+    }
+
+    double physicalDeltaX = 0;
+    double physicalDeltaY = 0;
+    double physicalDeltaZ = 0;
+    if (dataset->findAndGetFloat64(DCM_PhysicalDeltaX, physicalDeltaX).bad() ||
+        dataset->findAndGetFloat64(DCM_PhysicalDeltaY, physicalDeltaY).bad() ||
+        dataset->findAndGetFloat64(DcmTagKey(0x3001, 0x1003), physicalDeltaZ).bad()) {
+        std::cerr << "Error: cannot read pixel spacing from DICOM file\n";
+        return 1;
+    }
+
+    double spacing[3] = { physicalDeltaX * 10, physicalDeltaY * 10, physicalDeltaZ * 10 };
+
+    Sint32 numberOfFrames = 0;
+    if (dataset->findAndGetSint32(DcmTagKey(0x0028, 0x0008), numberOfFrames).bad()) {
+        std::cerr << "Error: cannot read number of frames from DICOM file\n";
+        return 1;
+    }
+
+    double frameTimeMsec = 0;
+    if (dataset->findAndGetFloat64(DcmTagKey(0x0018, 0x1063), frameTimeMsec).bad()) {
+        std::cerr << "Error: cannot read frame time from DICOM file\n";
+        return 1;
+    }
+
+    std::vector<int> pixelShape{static_cast<int>(numberOfFrames), static_cast<int>(slices),
+        static_cast<int>(rows), static_cast<int>(columns)};
+    std::cout << "Pixel shape: (" << pixelShape[0] << ", " << pixelShape[1] << ", " << pixelShape[2] << ", "
+        << pixelShape[3] << ")\n";
+
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
