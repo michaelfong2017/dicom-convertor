@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include <torch/cuda.h>
+#include <torch/torch.h>
 
 #include <vtkDICOMImageReader.h>
 #include <vtkImageAppendComponents.h>
@@ -17,11 +17,45 @@
 #include "dcmtk/dcmdata/dcdatset.h"
 #include "dcmtk/dcmdata/dcdeftag.h"
 
+void testCuda() {
+    int size = 10000;
+    // Create a random tensor on the CPU
+    torch::Tensor x_cpu = torch::rand({ size, size });
+
+    // Create a random tensor on the GPU, if available
+    torch::Device device = torch::kCPU;
+    if (torch::cuda::is_available()) {
+        std::cout << "CUDA is available! Testing on both GPU and CPU." << std::endl;
+        device = torch::kCUDA;
+
+        torch::Tensor x_gpu = torch::rand({ size, size }, device);
+
+        // Test the operation on the GPU tensor
+        auto start_gpu = std::chrono::high_resolution_clock::now();
+        torch::Tensor y_gpu = x_gpu + x_gpu;
+        auto end_gpu = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed_gpu = end_gpu - start_gpu;
+        std::cout << "Time taken on GPU: " << elapsed_gpu.count() << " seconds" << std::endl;
+    }
+    else {
+        std::cout << "CUDA is unavailable! Testing on CPU only." << std::endl;
+    }
+
+    // Test the operation on the CPU tensor
+    auto start_cpu = std::chrono::high_resolution_clock::now();
+    torch::Tensor y_cpu = x_cpu + x_cpu;
+    auto end_cpu = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_cpu = end_cpu - start_cpu;
+    std::cout << "Time taken on CPU: " << elapsed_cpu.count() << " seconds" << std::endl;
+}
+
 int main()
 {
     std::cout << "Number of CUDA devices available: " << torch::cuda::device_count() << std::endl;
     std::cout << "Whether at least one CUDA device is available: " << torch::cuda::is_available() << std::endl;
     std::cout << "Whether CUDA is available, and CuDNN is available: " << torch::cuda::cudnn_is_available() << std::endl;
+
+    testCuda();
 
     DcmFileFormat fileformat;
     if (fileformat.loadFile("C:\\Users\\user\\Documents\\dicom-convertor\\data\\PWHOR190734217S_12Oct2021_CX03WQDU_3DQ.dcm").good() == false) {
