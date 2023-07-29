@@ -5,6 +5,12 @@
 #include <string>
 #include <vector>
 
+#if __has_include(<filesystem>)
+#include <filesystem>
+#elif __has_include(<experimental/filesystem>)
+#include <experimental/filesystem>
+#endif
+
 #include <torch/torch.h>
 
 #include <vtkDICOMImageReader.h>
@@ -16,6 +22,8 @@
 #include "dcmtk/dcmdata/dcfilefo.h"
 #include "dcmtk/dcmdata/dcdatset.h"
 #include "dcmtk/dcmdata/dcdeftag.h"
+
+using namespace std;
 
 void testCuda() {
     int size = 10000;
@@ -57,8 +65,10 @@ int main()
 
     testCuda();
 
+    cout << "Current path is " << filesystem::current_path() << endl; // (1)
+
     DcmFileFormat fileformat;
-    if (fileformat.loadFile("C:\\Users\\user\\Documents\\dicom-convertor\\data\\PWHOR190734217S_12Oct2021_CX03WQDU_3DQ.dcm").good() == false) {
+    if (fileformat.loadFile("data\\PWHOR190734217S_12Oct2021_CX03WQDU_3DQ.dcm").good() == false) {
         std::cerr << "Error: cannot read DICOM file" << std::endl;
         return 1;
     }
